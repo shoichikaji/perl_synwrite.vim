@@ -78,4 +78,4 @@ if (s:MostLocal("perl_synwrite_au") > 0)
 endif
 
 "" the :Write command
-command -buffer -nargs=* -complete=file -range=% -bang Write call s:PerlSynDo("<bang>"=="!","<line1>,<line2>write<bang> <args>")
+command -buffer -nargs=* -complete=file -range=% -bang W call s:PerlSynDo("<bang>"=="!","<line1>,<line2>write<bang> <args>")

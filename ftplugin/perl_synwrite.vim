@@ -23,59 +23,35 @@ if exists("b:did_perl_synwrite")
 endif
 let b:did_perl_synwrite = 1
 
-" set defaults, to which s:MostLocal() will fall back
-let s:default_perl_synwrite_qf = 0
 let s:default_perl_synwrite_au = 0
-let s:default_perl_synwrite_perlopts = ""
-
-" get the named var from the first available of: buffer-local, global, default
-function! s:MostLocal(varname)
-  if exists("b:" . a:varname)
-    return b:{a:varname}
-  elseif exists(a:varname)
-    return {a:varname}
-  else
-    return s:default_{a:varname}
-  endif
-endfun
 
 "" execute the given do_command if the buffer is syntactically correct perl
 "" -- or if do_anyway is true
 function! s:PerlSynDo(do_anyway,do_command)
-  let command = "!perl -c"
+  let command = "!perl -wc"
 
-	if (s:MostLocal("perl_synwrite_au"))
-    " this env var tells Vi::QuickFix to replace "-" with actual filename
-		let $VI_QUICKFIX_SOURCEFILE=expand("%")
-    let command = command . " -MVi::QuickFix"
-	endif
-
-  " respect taint checking
-  if (match(getline(1), "^#!.*perl.\\+-T") == 0)
-    let command = command . " -T"
-  endif
-
-  let command = command . " " . s:MostLocal("perl_synwrite_perlopts")
+  " resolve local/lib/perl5/ and lib/ directories path,
+  " and append them to @INC
+  let root = expand('%:p:h')
+  while root != '/'
+    if isdirectory(root.'/lib') || isdirectory(root.'/local/lib/perl5')
+      let command = command . ' -I'.root.'/local/lib/perl5 -I'.root.'/lib'
+      break
+    endif
+    let root = resolve(root.'/..')
+  endwhile
+  " echo command
 
   " we need to cat here because :exec would add a space between ! and command
   " let to_exec = "write !" . command
   exec "write" command
 
-	silent! cgetfile " try to read the error file
-	if !v:shell_error || a:do_anyway
-		exec a:do_command
-		set nomod
-	endif
+  silent! cgetfile " try to read the error file
+  if !v:shell_error || a:do_anyway
+    exec a:do_command
+    set nomod
+  endif
 endfunction
-
-"" set up the autocommand, if b:perl_synwrite_au is true
-if (s:MostLocal("perl_synwrite_au") > 0)
-	let b:undo_ftplugin = "au! perl_synwrite * " . expand("%")
-
-	augroup perl_synwrite
-		exec "au BufWriteCmd,FileWriteCmd " . expand("%") . " call s:PerlSynDo(0,\"write <afile>\")"
-	augroup END
-endif
 
 "" the :Write command
 command -buffer -nargs=* -complete=file -range=% -bang W call s:PerlSynDo("<bang>"=="!","<line1>,<line2>write<bang> <args>")
